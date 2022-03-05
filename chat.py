@@ -1,3 +1,4 @@
+from asyncio.windows_events import NULL
 import os
 import sys
 import socket
@@ -26,7 +27,7 @@ clients = []
 #Initialize server
 HEADER = 64
 SERVER = myIP()
-if len(sys.argv) > 2:
+if len(sys.argv) > 2 or len(sys.argv) == 1:
     print(error)
     quit()
 
@@ -127,7 +128,9 @@ if __name__ == "__main__":
     while True:
         command = input("Please enter command:\n")
         param = command.split()
-        if(param[0] == "exit"):
+        if param == []:
+            print("\nInvalid command\nType \"help\" for command manual\n")
+        elif param[0] == "exit":
             print("terminating all clients...\n")
             terminateAll()
             break
