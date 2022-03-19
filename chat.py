@@ -1,45 +1,16 @@
-from asyncio.windows_events import NULL
+#Names: Steven Condor | Devin Delgado
+#Date: 2022.03.05
+#Application: chat
+#Purpose: To create TCP connections using sockets in which users can send messages to one another
+
 import os
 import sys
 import socket
 import threading
 import time
+from Util import *
 
-
-class clientList:
-    def __init__(self, socketID, addr):
-        self.socketID = socketID
-        self.addr = addr
-
-
-def myPort():
-    print("Your port number is: " + str(PORT) + "\n")
-
-def myIP():
-    return socket.gethostbyname(socket.gethostname())
-
-
-options = "Options:\n\nhelp                                  Command manual\nmyip                                  Display the IP address\nmyport                                Display current port\nconnect <destination> <port no>       Establishes a new TCP connection\nlist                                  Display a list of all connections\nterminate <connection id.>            Terminate specified connection(connection id. from list command)\nsend <connection id.> <message>       Send a message to specified connection(connection id. from list command)\nexit                                  Terminates application\n";
-error = "You need to provide a port number for the TCP connection\nPlease try:\n./chat <port number>\n"
-error2 = "Please enter a valid id\nRefer to the connection by typing \"list\"\n"
 clients = []
-
-#Initialize server
-HEADER = 64
-SERVER = myIP()
-if len(sys.argv) > 2 or len(sys.argv) == 1:
-    print(error)
-    quit()
-
-if sys.argv[1].isdigit():
-    PORT = int(sys.argv[1]);
-    myPort()
-else:
-    print(error)
-    quit()
-ADDR = (SERVER, PORT)
-FORMAT = 'utf-8'
-DISCONNECT_MESSAGE = "!DISCONNECT"
 
 def printList():
     if len(clients) == 0:
@@ -52,10 +23,8 @@ def printList():
         print(str(i) + ": " + client.addr[0] + "     " + str(client.addr[1]))
         i += 1
 
-def isInClient(id):
-    if len(clients) == 0:
-        return False
-    elif id > 0 and id <= len(clients):
+def isInClients(id):
+    if id > 0 and id <= len(clients):
         return True
     return False
 
@@ -67,25 +36,47 @@ def handle_client(conn, addr):
     
     connected = True
     while connected:
-        msg_length = conn.recv(HEADER).decode(FORMAT)
+        try:
+            msg_length = conn.recv(HEADER).decode(FORMAT)
+        except socket.error:
+            print("\nFailed to receive message from client\n")
+            continue
         # If a message does exist and is not NULL
         if msg_length:
             msg_length = int(msg_length)
             msg = conn.recv(msg_length).decode(FORMAT)
             if msg == DISCONNECT_MESSAGE:
                 connected = False
-                sendMSG(clients.index(newConnection) + 1, DISCONNECT_MESSAGE)
+                terminate(clients.index(newConnection) + 1)
+                print("\nTerminating connection to IP: {} , PORT: {}\n".format(addr[0],addr[1]))
+                continue
             
             #conn.send("Message Received".encode(FORMAT))
-            print(f"[{addr}] {msg}")
+            print("\nMessage received from {}\nSender's Port: {}\nMessage: {}\n".format(addr[0], addr[1], msg))
+            #print(f"[{addr}] {msg}")
     
     clients.remove(newConnection)
     conn.close()
 
+def isDuplicate(conn_ip, conn_port):
+    if conn_ip == ADDR[0] and conn_port == ADDR[1]:
+        return True
+    for client in clients:
+        if conn_ip == client.addr[0] and conn_port == client.addr[1]:
+            return True
+    return False
+
 def createConnection(conn_ip, conn_port):
+    if isDuplicate(conn_ip, int(conn_port)):
+        print("\nEntered connection is not valid\n")
+        return
     conn_addr = (conn_ip, int(conn_port))
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client.connect(conn_addr)
+    try:
+        client.connect(conn_addr)
+    except socket.error:
+        print("\nCould not stablish connection to specified server\n")
+        return
     thread = threading.Thread(target = handle_client, args = (client, conn_addr))
     thread.start()
 
@@ -95,14 +86,19 @@ def sendMSG(id, msg):
     send_length = str(msg_length).encode(FORMAT)
     # Makes sure the message is 64 bytes long
     send_length += b' ' * (HEADER - len(send_length))
-    clients[id-1].socketID.send(send_length)
-    clients[id-1].socketID.send(message)
-    #print(clients[id-1].socketID.recv(2048).decode(FORMAT))
+    try:
+        clients[id-1].socketID.send(send_length)
+        clients[id-1].socketID.send(message)
+        if msg == DISCONNECT_MESSAGE:
+            pass
+        else:
+            print("\nMessage sent to {}\n".format(clients[id-1].addr[0]))
+        #print(clients[id-1].socketID.recv(2048).decode(FORMAT))
+    except socket.error:
+        print("\nFailed to send message\n")
 
 def terminate(id):
     sendMSG(id, DISCONNECT_MESSAGE)
-    #clients[id-1].socketID.close()
-    #del clients[id-1]
 
 def terminateAll():
     for i in range(len(clients)):
@@ -110,26 +106,42 @@ def terminateAll():
 
 def startServer():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind(ADDR)
-    server.listen()
-    # See what IP address the server is running on
-    print(f"[LISTENING] Server is listening on {SERVER}")
+    try:
+        server.bind(ADDR)
+        server.listen()
+    except socket.error:
+        print(error)
+        os._exit(1)
+        
+    print(f"\n[LISTENING] Server is listening on IP: {ADDR[0]}, PORT: {ADDR[1]}")
+
     while True:
-        conn, addr = server.accept()
+        try:
+            conn, addr = server.accept()
+        except socket.error:
+            print("\nFailed to connect to connect a client\n")
+            continue
         thread = threading.Thread(target = handle_client, args = (conn, addr))
         thread.start()
         print(f"[ACTIVE CONNECTIONS {threading.active_count() - 2}]")
+
         
 
+
+
 if __name__ == "__main__":
+    ADDR = initADDR(sys.argv)
+    myPort()
+    
     thread = threading.Thread(target = startServer, args = ())
     thread.start()
     print(options)
     while True:
         command = input("Please enter command:\n")
         param = command.split()
-        if param == []:
-            print("\nInvalid command\nType \"help\" for command manual\n")
+        #implement a len(param) == 1 for all single param commands
+        if len(param) == 0:
+            print(error3)
         elif param[0] == "exit":
             print("terminating all clients...\n")
             terminateAll()
@@ -139,27 +151,28 @@ if __name__ == "__main__":
         elif param[0] == "myport":
             myPort()
         elif param[0] == "connect":
-            createConnection(param[1], param[2])
+            if len(param) == 3:
+                createConnection(param[1], param[2])
+                continue
+            print(error3)
         elif param[0] == "list":
             printList()
         elif param[0] == "terminate":
-            if len(param) > 2:
-                print("You can only terminate one connection at a time\n")
+            if len(param) == 1 or len(param) > 2:
+                print(error3)
             elif param[1].isdigit():
-                if isInClient(int(param[1])):
+                if isInClients(int(param[1])):
                     terminate(int(param[1]))
                 else:
                     print("Client id does not exist\n")
             else:
                 print(error2)
         elif param[0] == "send":
-            if param[1].isdigit():
-                if isInClient(int(param[1])):
-                    if len(param) > 3:
-                        sendMSG(int(param[1]), " ".join(param[2:]))
-                    else:
-                        sendMSG(int(param[1]), param[2])
-                    
+            if len(param) <= 2:
+                print(error3)
+            elif param[1].isdigit():
+                if isInClients(int(param[1])):
+                    sendMSG(int(param[1]), " ".join(param[2:]))
                 else:
                     print("Client id does not exist")
             else:
@@ -167,8 +180,8 @@ if __name__ == "__main__":
         elif param[0] == "myip":
             print("\nCurrent IP: " + myIP())
         else:
-            print("\nInvalid command\nType \"help\" for command manual\n")
-    time.sleep(5)
+            print(error3)
+    time.sleep(3)
     os._exit(0)
 
 
