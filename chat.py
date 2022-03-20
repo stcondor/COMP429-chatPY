@@ -1,5 +1,5 @@
 #Names: Steven Condor | Devin Delgado
-#Date: 2022.03.05
+#Date: 2022.03.19
 #Application: chat
 #Purpose: To create TCP connections using sockets in which users can send messages to one another
 
@@ -131,8 +131,6 @@ def startServer():
 
 if __name__ == "__main__":
     ADDR = initADDR(sys.argv)
-    myPort()
-    
     thread = threading.Thread(target = startServer, args = ())
     thread.start()
     print(options)
@@ -143,12 +141,21 @@ if __name__ == "__main__":
         if len(param) == 0:
             print(error3)
         elif param[0] == "exit":
+            if len(param) > 1:
+                print(error3)
+                continue
             print("terminating all clients...\n")
             terminateAll()
             break
         elif param[0] == "help":
+            if len(param) > 1:
+                print(error3)
+                continue
             print(options)
         elif param[0] == "myport":
+            if len(param) > 1:
+                print(error3)
+                continue
             myPort()
         elif param[0] == "connect":
             if len(param) == 3:
@@ -156,6 +163,9 @@ if __name__ == "__main__":
                 continue
             print(error3)
         elif param[0] == "list":
+            if len(param) > 1:
+                print(error3)
+                continue
             printList()
         elif param[0] == "terminate":
             if len(param) == 1 or len(param) > 2:
@@ -178,6 +188,9 @@ if __name__ == "__main__":
             else:
                 print(error2)
         elif param[0] == "myip":
+            if len(param) > 1:
+                print(error3)
+                continue
             print("\nCurrent IP: " + myIP())
         else:
             print(error3)
